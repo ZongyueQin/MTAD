@@ -221,7 +221,8 @@ class MTADGenerator(SpeculativeGenerator):
         self.max_new_tokens = max_new_tokens
         self.strategy: strategies.Strategy = None
 
-        self.strategy = strategies.BatchMTADStrategy(
+        if tree_attn == False:
+            self.strategy = strategies.BatchMTADStrategy(
                 draft_model=draft_model,
                 target_model=target_model,
                 k_config=k_config,
@@ -233,5 +234,19 @@ class MTADGenerator(SpeculativeGenerator):
                 speculative_sampling=speculative_sampling,
                 top_k = top_k,
                 top_p = top_p,
-        )
+            )
+        else:
+            self.strategy = strategies.TreeMTADStrategy(
+                draft_model=draft_model,
+                target_model=target_model,
+                k_config=k_config,
+                beam_width=beam_width,
+                accept_thres=accept_thres,
+                draft_model_temp=draft_model_temp,
+                target_model_temp=target_model_temp,
+                replacement=replacement,
+                speculative_sampling=speculative_sampling,
+                top_k = top_k,
+                top_p = top_p,
+            )
 
