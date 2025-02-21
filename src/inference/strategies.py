@@ -1363,8 +1363,11 @@ class TreeMTADStrategy(Strategy):
                 log_ratio = log_cum_target_prob[i] - log_cum_draft_prob[i]
                 if log_ratio > self.log_accept_thres:
                     acc_len = depth + 1
-                    if (best_log_p is None) or (log_cum_target_prob[i] > best_log_p):
-                        best_log_p = log_cum_target_prob[i]
+#                    if (best_log_p is None) or (log_cum_target_prob[i] > best_log_p):
+#                        best_log_p = log_cum_target_prob[i]
+                    if (best_log_p is None) or (log_ratio > best_log_p):
+                        best_log_p = log_ratio
+ 
                         best_idx = i
                 else:
                     pass

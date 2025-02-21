@@ -5,6 +5,32 @@ import torch.nn.functional as F
 import os
 import re
 
+def get_score(output, target_model, input_len):
+    with torch.no_grad():
+        if target_model.config.is_encoder_decoder == False:
+            logits = target_model(output).logits
+            logits = logits[:,:-1,:]
+            logits = torch.nn.functional.log_softmax(logits, dim=-1)
+            logits = torch.gather(logits,
+                          dim = -1,
+                          index = output[:,1:,None])
+            if logits.isnan().any():
+                print(logits.size())
+                print(logits)
+                print(old_logits)
+                xxx = input()
+
+            return torch.mean(logits[:,input_len-1:,:])
+        else:
+            logits = target_model(output[:, :input_len], decoder_input_ids=output[:,input_len:]).logits
+            logits = logits[:, :-1, :]
+            logits = torch.nn.functional.log_softmax(logits, dim=-1)
+            logits = torch.gather(logits,
+                                  dim = -1,
+                                  index = output[:, input_len+1:, None])
+            return torch.mean(logits)
+
+
 # copy from https://github.com/LeeSinLiang/microGPT/blob/ed40cf9780dbeb180adfe94c227d4aa97e69250e/gpt.py
 def top_k_top_p_filter(logits: torch.Tensor, top_k: int = 0, top_p: float = 0.0):
     """

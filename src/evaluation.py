@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '7'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 hf_token = os.environ['HFTOKEN']
 
 import argparse
@@ -17,6 +17,7 @@ import random
 import numpy as np
 from utils import find_fields_MYSQL_like, creating_schema, spider_examples
 from utils import execution_accuracy_references, extract_first_function
+from utils import get_score
 
 def set_seed(seed: int):
     random.seed(seed)                      # Python random module
@@ -127,6 +128,7 @@ def run_eval(
 
     iterator = range(len(dataloader))
     pred_seq = []
+    score_list = []
     with torch.no_grad():
         for sample_idx in iterator if disable_tqdm else tqdm(iterator):
             prompt_text = dataloader[sample_idx]
@@ -145,6 +147,8 @@ def run_eval(
                 string = tokenizer.decode(output.sequences[0], skip_special_tokens=True)
                 pred_seq.append(extract_first_function(string))
 
+            score = get_score(output.sequences, target_model, input_len)
+            score_list.append(score.item())
 
     end_time = time.time()
 
@@ -160,6 +164,7 @@ def run_eval(
     logger.info("Token latency: {:.2f} ms".format(latency * 1000))
     logger.info("Acceptance rate: {:.2f}".format(acceptance_rate))
     logger.info("Block efficiency: {:.2f}".format(block_efficiency))
+    logger.info("PPL: {:.2f}".format(np.exp(-np.mean(score_list))))
     return pred_seq
 
 
@@ -271,7 +276,7 @@ def main(args):
         device_map=0,
         use_flash_attention_2=True if args.flash_attn else False,
         token = hf_token,
-        cache_dir = '/local2/qzy_scai/cache/huggingface/',
+        cache_dir = '/llmss/cache/huggingface/',
     )
 
     logger.info("Loading target model: {}".format(args.target_model))
@@ -282,7 +287,7 @@ def main(args):
         use_flash_attention_2=True if args.flash_attn else False,
         token = hf_token,
         max_memory={0: "38GiB"},
-        cache_dir = '/local2/qzy_scai/cache/huggingface/',
+        cache_dir = '/llmss/cache/huggingface/',
 
     )
 
