@@ -1359,14 +1359,17 @@ class TreeMTADStrategy(Strategy):
                 
             best_log_p = None
             best_idx = None
+            max_log_cum_draft_prob = log_cum_draft_prob.max()
             for i in range(self.beam_width):
-                log_ratio = log_cum_target_prob[i] - log_cum_draft_prob[i]
+                log_ratio = log_cum_target_prob[i] - max_log_cum_draft_prob
+#                log_ratio = log_cum_target_prob[i] - log_cum_draft_prob[i]
+
                 if log_ratio > self.log_accept_thres:
                     acc_len = depth + 1
-#                    if (best_log_p is None) or (log_cum_target_prob[i] > best_log_p):
-#                        best_log_p = log_cum_target_prob[i]
-                    if (best_log_p is None) or (log_ratio > best_log_p):
-                        best_log_p = log_ratio
+                    if (best_log_p is None) or (log_cum_target_prob[i] > best_log_p):
+                        best_log_p = log_cum_target_prob[i]
+#                    if (best_log_p is None) or (log_ratio > best_log_p):
+#                        best_log_p = log_ratio
  
                         best_idx = i
                 else:
@@ -1375,15 +1378,17 @@ class TreeMTADStrategy(Strategy):
 
         if acc_len == 0:
             select_idx = torch.ones((input_len), dtype=torch.bool)
-            select_idx[-self.num_token_per_iter] = False
+            select_idx[-self.num_token_per_iter:] = False
             accept_beam_pos = -1
         else:
             accept_beam_pos = (acc_len - 1) * self.beam_width + best_idx_list[acc_len-1]
             select_idx = self.tree_att_mask[accept_beam_pos]
+            #TODO check this
 
         draft_select_idx = select_idx[:-self.beam_width]
 
         input_ids = input_ids[:, select_idx]
+#        print(select_idx)
         endpoint_token = torch.multinomial(
                 ground_probs[:, accept_beam_pos+1], num_samples=1
                 ).to(device=input_ids.device)
