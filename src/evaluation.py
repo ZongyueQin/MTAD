@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '7'
 hf_token = os.environ['HFTOKEN']
 
 import argparse
@@ -17,7 +17,8 @@ import random
 import numpy as np
 from utils import find_fields_MYSQL_like, creating_schema, spider_examples
 from utils import execution_accuracy_references, extract_first_function
-from utils import get_score
+from utils import get_score, get_total_power
+import subprocess
 
 def set_seed(seed: int):
     random.seed(seed)                      # Python random module
@@ -129,6 +130,9 @@ def run_eval(
     iterator = range(len(dataloader))
     pred_seq = []
     score_list = []
+
+    P = subprocess.Popen("exec python3 -u gpu_power_monitor.py",shell=True, text=True, stdout=subprocess.PIPE)
+
     with torch.no_grad():
         for sample_idx in iterator if disable_tqdm else tqdm(iterator):
             prompt_text = dataloader[sample_idx]
@@ -151,6 +155,8 @@ def run_eval(
             score_list.append(score.item())
 
     end_time = time.time()
+    P.kill()
+    P.wait()
 
     logger.info("evaluation complete.")
 
@@ -160,10 +166,15 @@ def run_eval(
     acceptance_rate = acceptance_count / draft_token_count
     block_efficiency = 1 + acceptance_count / invocation_count
 
+    outputs = P.stdout.readlines()
+    power_total = get_total_power(outputs, start_time, end_time, None)
+
+
     logger.info("Running time: {:.2f} s".format(run_time))
     logger.info("Token latency: {:.2f} ms".format(latency * 1000))
     logger.info("Acceptance rate: {:.2f}".format(acceptance_rate))
     logger.info("Block efficiency: {:.2f}".format(block_efficiency))
+    logger.info("J/token: {:.2f}".format(power_total/(acceptance_count+invocation_count)))
     logger.info("PPL: {:.2f}".format(np.exp(-np.mean(score_list))))
     return pred_seq
 

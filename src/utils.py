@@ -5,6 +5,23 @@ import torch.nn.functional as F
 import os
 import re
 
+def get_total_power(outputs, t1, t2, fname):
+    if fname is not None:
+        with open(fname, 'wb') as f:
+            pickle.dump((outputs, t1, t2), f)
+    x = [out.strip().split() for out in outputs]
+    x = [[float(xx[0]), float(xx[1])] for xx in x if len(xx) >= 2] # it seems possible that the last output of nvidia-smi is missing
+    total_power = 0
+    first_one = True
+    for timestamp, power in x:
+        if timestamp > t1 and timestamp < t2:
+            if first_one:
+                first_one = False
+            else:
+                total_power += power
+    return total_power
+
+
 def get_score(output, target_model, input_len):
     with torch.no_grad():
         if target_model.config.is_encoder_decoder == False:
