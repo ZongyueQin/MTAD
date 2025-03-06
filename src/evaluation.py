@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '7'
+os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 hf_token = os.environ['HFTOKEN']
 
 import argparse
@@ -9,7 +9,7 @@ import time
 from typing import Literal, Tuple
 
 import torch
-from inference.generate import Generator, BaseGenerator, SpeculativeGenerator, MTADGenerator
+from inference.generate import Generator, BaseGenerator, SpeculativeGenerator, MTADGenerator, DSBDGenerator
 from model.llama_tree_attn import LlamaForCausalLM, LlamaTokenizer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from tqdm import tqdm
@@ -68,8 +68,11 @@ def run_eval(
     sampling_type: Literal["argmax", "sampling"] = "sampling",
     disable_tqdm: bool = False,
     mtad: bool = True,
+    dsbd: bool = False,
     beam_width: int = 4,
     accept_thres: float = 0.5,
+    expect_thres: float = 0.8,
+    min_accept_num: int = 1,
     top_k: int = 10,
     top_p: float = 0.9,
 ):
@@ -101,6 +104,24 @@ def run_eval(
         top_k = top_k,
         top_p = top_p,
       )
+    elif dsbd:
+       generator = DSBDGenerator(
+        draft_model,
+        target_model,
+        eos_token_id=tokenizer.eos_token_id,
+        k_config=k_config,
+        beam_width = beam_width,
+        min_accept_num = min_accept_num,
+        expect_thres = expect_thres,
+        max_new_tokens=max_new_tokens,
+        draft_model_temp=draft_model_temp,
+        target_model_temp=target_model_temp,
+        replacement=replacement,
+        speculative_sampling=speculative_sampling,
+        top_k = top_k,
+        top_p = top_p,
+      )
+       
     else:
       generator = SpeculativeGenerator(
         draft_model,
@@ -236,6 +257,12 @@ def run_baseline_eval(
 
 
 def main(args):
+    if args.mtad == True and args.dsbd == True:
+        logger.warning(
+            "When both --mtad and --dsbd flags are set, only running mtad."
+        )
+        args.dsbd = False
+
 
     set_seed(args.seed)  # Set a fixed seed
     torch_dtype = torch.float16 if args.fp16 else torch.float32
@@ -331,6 +358,9 @@ def main(args):
             sampling_type=args.sampling_type,
             disable_tqdm=args.disable_tqdm,
             mtad = args.mtad,
+            dsbd = args.dsbd,
+            expect_thres = args.expect_thres,
+            min_accept_num = args.min_accept_num,
             top_k = args.top_k,
             top_p = args.top_p,
         )
@@ -393,9 +423,16 @@ if __name__ == "__main__":
     parser.add_argument("--run-baseline", action="store_true")
 
     parser.add_argument("--flash-attn", action="store_true")
+    # mtad parameters
     parser.add_argument("--mtad", action="store_true")
     parser.add_argument("--beam-width", type=int, default=4)
     parser.add_argument("--accept-thres", type=float, default=0.5)
+
+    # dsbd parameters
+    parser.add_argument("--dsbd", action="store_true")
+    parser.add_argument("--min-accept-num", type=int, default=1)
+    parser.add_argument("--expect-thres", type=float, default=0.8)
+
     parser.add_argument("--top-p", type=float, default=0.9)
     parser.add_argument("--top-k", type=int, default=10)
 
