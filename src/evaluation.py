@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '7'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 hf_token = os.environ['HFTOKEN']
 
 import argparse
@@ -287,7 +287,7 @@ def main(args):
         device_map=0,
         use_flash_attention_2=True if args.flash_attn else False,
         token = hf_token,
-        cache_dir = '/local2/qzy_scai/cache/huggingface/',
+        cache_dir = '/llmss/cache/huggingface/',
     )
 
     logger.info("Loading target model: {}".format(args.target_model))
@@ -298,7 +298,7 @@ def main(args):
         use_flash_attention_2=True if args.flash_attn else False,
         token = hf_token,
         max_memory={0: "38GiB"},
-        cache_dir = '/local2/qzy_scai/cache/huggingface/',
+        cache_dir = '/llmss/cache/huggingface/',
 
     )
 
