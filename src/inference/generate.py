@@ -250,3 +250,40 @@ class MTADGenerator(SpeculativeGenerator):
                 top_p = top_p,
             )
 
+class DSBDGenerator(SpeculativeGenerator):
+    def __init__(
+        self,
+        draft_model,
+        target_model,
+        eos_token_id: int,
+        k_config: Tuple[int],
+        beam_width: int = 4,
+        min_accept_num: int = 1,
+        expect_thres: float = 0.8,
+        max_new_tokens: int = 128,
+        draft_model_temp: float = 1,
+        target_model_temp: float = 1,
+        replacement: bool = False,
+        speculative_sampling: bool = True,
+        top_k: int = 10,
+        top_p: float = 0.9,
+    ) -> None:
+        self.eos_token_id = eos_token_id
+        self.max_new_tokens = max_new_tokens
+        self.strategy: strategies.Strategy = None
+
+        self.strategy = strategies.SingleDSBDStrategy(
+                draft_model=draft_model,
+                target_model=target_model,
+                k_config=k_config,
+                beam_width=beam_width,
+                min_accept_num = min_accept_num,
+                expect_thres=expect_thres,
+                draft_model_temp=draft_model_temp,
+                target_model_temp=target_model_temp,
+                replacement=replacement,
+                speculative_sampling=speculative_sampling,
+                top_k = top_k,
+                top_p = top_p,
+            )
+
