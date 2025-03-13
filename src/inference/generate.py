@@ -214,6 +214,7 @@ class MTADGenerator(SpeculativeGenerator):
         speculative_sampling: bool = True,
         tree_attn: bool = True,
         mtad: bool = True,
+        v2: bool = True,
         top_k: int = 10,
         top_p: float = 0.9,
     ) -> None:
@@ -236,19 +237,35 @@ class MTADGenerator(SpeculativeGenerator):
                 top_p = top_p,
             )
         else:
-            self.strategy = strategies.TreeMTADStrategy(
-                draft_model=draft_model,
-                target_model=target_model,
-                k_config=k_config,
-                beam_width=beam_width,
-                accept_thres=accept_thres,
-                draft_model_temp=draft_model_temp,
-                target_model_temp=target_model_temp,
-                replacement=replacement,
-                speculative_sampling=speculative_sampling,
-                top_k = top_k,
-                top_p = top_p,
-            )
+            if v2 == False:
+                self.strategy = strategies.TreeMTADStrategy(
+                  draft_model=draft_model,
+                  target_model=target_model,
+                  k_config=k_config,
+                  beam_width=beam_width,
+                  accept_thres=accept_thres,
+                  draft_model_temp=draft_model_temp,
+                  target_model_temp=target_model_temp,
+                  replacement=replacement,
+                  speculative_sampling=speculative_sampling,
+                  top_k = top_k,
+                  top_p = top_p,
+                )
+            else:
+                self.strategy = strategies.TreeMTADStrategy_v2(
+                  draft_model=draft_model,
+                  target_model=target_model,
+                  k_config=k_config,
+                  beam_width=beam_width,
+                  accept_thres=accept_thres,
+                  draft_model_temp=draft_model_temp,
+                  target_model_temp=target_model_temp,
+                  replacement=replacement,
+                  speculative_sampling=speculative_sampling,
+                  top_k = top_k,
+                  top_p = top_p,
+                )
+
 
 class DSBDGenerator(SpeculativeGenerator):
     def __init__(
