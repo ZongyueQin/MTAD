@@ -1636,7 +1636,6 @@ class TreeMTADStrategy_v2(TreeMTADStrategy):
             input_ids, target_model_past_key_values
         )
         cand_probs, verify_thres = tuple(cand_probs[0]), tuple(cand_probs[1])
-        print(cand_probs, verify_thres)
 
 
         if self.target_model_temp == 0:

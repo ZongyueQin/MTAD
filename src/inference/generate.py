@@ -6,6 +6,7 @@ from transformers.modeling_outputs import ModelOutput, CausalLMOutputWithPast
 
 from . import strategies
 from utils import norm_logits
+import time
 
 
 @dataclass
@@ -121,6 +122,9 @@ class SpeculativeGenerator:
         self.eos_token_id = eos_token_id
         self.max_new_tokens = max_new_tokens
         self.strategy: strategies.Strategy = None
+        self.draft_time = 0
+        self.verify_time = 0
+        self.other_time = 0
 
         if tree_attn:
             self.strategy = strategies.TreeStrategy(
@@ -160,12 +164,16 @@ class SpeculativeGenerator:
         init_input_len = input_ids.size(-1)
 
         while True:
+            start_time = time.time()
             draft_output = self.strategy.generate_draft(
                 input_ids,
                 past_key_values=draft_model_past_key_values,
             )
 
             draft_model_past_key_values = draft_output.past_key_values
+            self.draft_time += time.time() - start_time
+
+            start_time = time.time()
 
             verification_output = self.strategy.verify(
                 input_ids=draft_output.sequences,
@@ -173,6 +181,9 @@ class SpeculativeGenerator:
                 draft_model_past_key_values=draft_output.past_key_values,
                 cand_probs=draft_output.cand_probs,
             )
+            self.verify_time += time.time() - start_time
+
+            start_time = time.time()
 
             input_ids = verification_output.sequences
 
@@ -185,6 +196,7 @@ class SpeculativeGenerator:
 
             invocation_count += 1
             acceptance_count += verification_output.acceptance_count
+            self.other_time += time.time() - start_time
 
             if (
                 self.eos_token_id in input_ids[0, -self.strategy.max_draft_len :]
@@ -214,13 +226,17 @@ class MTADGenerator(SpeculativeGenerator):
         speculative_sampling: bool = True,
         tree_attn: bool = True,
         mtad: bool = True,
-        v2: bool = True,
+        v2: bool = False,
         top_k: int = 10,
         top_p: float = 0.9,
     ) -> None:
         self.eos_token_id = eos_token_id
         self.max_new_tokens = max_new_tokens
         self.strategy: strategies.Strategy = None
+        self.draft_time = 0
+        self.verify_time = 0
+        self.other_time = 0
+
 
         if tree_attn == False:
             self.strategy = strategies.BatchMTADStrategy(
@@ -288,6 +304,10 @@ class DSBDGenerator(SpeculativeGenerator):
         self.eos_token_id = eos_token_id
         self.max_new_tokens = max_new_tokens
         self.strategy: strategies.Strategy = None
+        self.draft_time = 0
+        self.verify_time = 0
+        self.other_time = 0
+
 
         self.strategy = strategies.SingleDSBDStrategy(
                 draft_model=draft_model,

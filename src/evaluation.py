@@ -19,6 +19,7 @@ from utils import find_fields_MYSQL_like, creating_schema, spider_examples
 from utils import execution_accuracy_references, extract_first_function
 from utils import get_score, get_total_power
 import subprocess
+from torch.profiler import profile, record_function, ProfilerActivity
 
 def set_seed(seed: int):
     random.seed(seed)                      # Python random module
@@ -75,6 +76,7 @@ def run_eval(
     min_accept_num: int = 1,
     top_k: int = 10,
     top_p: float = 0.9,
+    v2: bool = False,
 ):
     if sampling_type not in ["argmax", "sampling"]:
         raise ValueError(
@@ -103,6 +105,7 @@ def run_eval(
         tree_attn=tree_attn,
         top_k = top_k,
         top_p = top_p,
+        v2 = v2,
       )
     elif dsbd:
        generator = DSBDGenerator(
@@ -153,14 +156,23 @@ def run_eval(
     score_list = []
 
     P = subprocess.Popen("exec python3 -u gpu_power_monitor.py",shell=True, text=True, stdout=subprocess.PIPE)
+    detailed_runtime = 0
 
     with torch.no_grad():
+     with profile(activities=[ProfilerActivity.CPU,
+                              ProfilerActivity.CUDA],
+                  record_shapes = False,
+                  ) as prof:
+      with record_function("model_inference"):
         for sample_idx in iterator if disable_tqdm else tqdm(iterator):
             prompt_text = dataloader[sample_idx]
             inputs = tokenizer(prompt_text, return_tensors="pt", max_length=512, truncation=True).to("cuda")
             input_ids = inputs.input_ids
             input_len = input_ids.size(-1)
+
+            s = time.time()
             output = generator.generate(input_ids)
+            detailed_runtime += time.time() - s
 
             acceptance_count += output.acceptance_count
             draft_token_count += output.draft_token_count
@@ -174,6 +186,7 @@ def run_eval(
 
             score = get_score(output.sequences, target_model, input_len)
             score_list.append(score.item())
+    print(prof.key_averages().table(sort_by="cuda_time_total"))
 
     end_time = time.time()
     P.kill()
@@ -184,6 +197,8 @@ def run_eval(
     run_time = end_time - start_time
 
     latency = run_time / (acceptance_count + invocation_count)
+    detailed_latency = detailed_runtime / (acceptance_count + invocation_count)
+
     acceptance_rate = acceptance_count / draft_token_count
     block_efficiency = 1 + acceptance_count / invocation_count
 
@@ -193,10 +208,15 @@ def run_eval(
 
     logger.info("Running time: {:.2f} s".format(run_time))
     logger.info("Token latency: {:.2f} ms".format(latency * 1000))
+    logger.info("Detailed Token latency: {:.2f} ms".format(detailed_latency * 1000))
     logger.info("Acceptance rate: {:.2f}".format(acceptance_rate))
     logger.info("Block efficiency: {:.2f}".format(block_efficiency))
     logger.info("J/token: {:.2f}".format(power_total/(acceptance_count+invocation_count)))
     logger.info("PPL: {:.2f}".format(np.exp(-np.mean(score_list))))
+    logger.info("draft time: {:.2f}".format(generator.draft_time))
+    logger.info("verify time: {:.2f}".format(generator.verify_time))
+    logger.info("other time: {:.2f}".format(generator.other_time))
+
     return pred_seq
 
 
@@ -267,7 +287,7 @@ def main(args):
     set_seed(args.seed)  # Set a fixed seed
     torch_dtype = torch.float16 if args.fp16 else torch.float32
 
-    logger.info("The full evaluation configuration:\n" + repr(args))
+#    logger.info("The full evaluation configuration:\n" + repr(args))
 
     if args.auto_model and not args.disable_tree_attn:
         logger.warning(
@@ -295,7 +315,8 @@ def main(args):
                        "Question: " + s["question"] + "\n" + 
                        "SQL:" for s in dataset]
         output_dataset = [s["db_id"] + "[SQL]" + s["query"] for s in dataset] 
-        dataloader = dataloader[:100]
+#        print(len(dataloader))
+        dataloader = dataloader[:10]
 
     else:
         raise NotImplementedError
@@ -303,8 +324,8 @@ def main(args):
     ModelLoader = AutoModelForCausalLM if args.auto_model else LlamaForCausalLM
     TokenizerLoader = AutoTokenizer if args.auto_model else LlamaTokenizer
 
-    print(args.tokenizer, type(args.tokenizer))
-    print(hf_token, type(hf_token))
+#    print(args.tokenizer, type(args.tokenizer))
+#    print(hf_token, type(hf_token))
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, trust_remote_code = True, token = hf_token)
 
     logger.info("Loading draft model: {}".format(args.draft_model))
@@ -363,6 +384,7 @@ def main(args):
             min_accept_num = args.min_accept_num,
             top_k = args.top_k,
             top_p = args.top_p,
+            v2 = args.v2,
         )
         if args.dataset == "spider":
             cnt = len(pred_seq)
@@ -425,6 +447,8 @@ if __name__ == "__main__":
     parser.add_argument("--flash-attn", action="store_true")
     # mtad parameters
     parser.add_argument("--mtad", action="store_true")
+    parser.add_argument("--v2", action="store_true")
+
     parser.add_argument("--beam-width", type=int, default=4)
     parser.add_argument("--accept-thres", type=float, default=0.5)
 
