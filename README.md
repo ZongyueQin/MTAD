@@ -7,6 +7,10 @@ The implementation is based on [MCSD](https://github.com/NJUNLP/MCSD).
 
 ---
 
+## Update
+
+**2025.4.9**: Implement Multi-Candidate MTAD, which incorporates tree-wise parallel decoding for better efficiency and output quality. The details of the algorithm will be released on arxiv. 
+
 ## 🚀 Dependencies
 Ensure you have the following installed:
 
