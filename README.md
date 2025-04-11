@@ -62,6 +62,7 @@ Then, run `evaluation.py` with the appropriate options.
 | `--max-new-tokens` | Maximum number of new tokens |
 | `--replacement` | Enable sampling with replacement |
 | `--disable-tqdm` | Disable tqdm progress bar |
+|  --disable-tree-attn   | Disable tree parallel decoding, use it when you want to run original MTAD |
 
 ---
 
