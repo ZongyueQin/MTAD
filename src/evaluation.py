@@ -384,7 +384,7 @@ def main(args):
             min_accept_num = args.min_accept_num,
             top_k = args.top_k,
             top_p = args.top_p,
-            v2 = args.v2,
+            v2 = not args.disable_tree_attn,
         )
         if args.dataset == "spider":
             cnt = len(pred_seq)
@@ -447,7 +447,7 @@ if __name__ == "__main__":
     parser.add_argument("--flash-attn", action="store_true")
     # mtad parameters
     parser.add_argument("--mtad", action="store_true")
-    parser.add_argument("--v2", action="store_true")
+    #parser.add_argument("--v2", action="store_true")
 
     parser.add_argument("--beam-width", type=int, default=4)
     parser.add_argument("--accept-thres", type=float, default=0.5)
